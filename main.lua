@@ -108,7 +108,7 @@ end
 
 while epoch < opt.epochs do
 
-    train()
+    trainOptim()
     test()
 end
 

@@ -25,15 +25,15 @@ if dataset == 'mnist' then
 
     -- train data
     local temp = torch.load('data/mnist/train.th7', 'ascii')
-    trsize = 1000 --temp[1]:size()[1]
+    trsize = temp[1]:size()[1]
+
     trainData.data = torch.DoubleTensor(trsize, HEIGHT, WIDTH * opt.digits, 1)
-    trainData.labels = {}
+    trainData.labels = torch.DoubleTensor(trsize, opt.digits)
     for rec = 1, trsize do
         local tempData
         for digit = 1, opt.digits do
             if digit == 1 then
                 tempData = temp[1][rec]
-                trainData.labels[rec] = {}
                 trainData.labels[rec][digit] = (temp[2][rec] == 0 and 10 or temp[2][rec])
             else
                 local rand = math.floor(math.random() * trsize) + 1
@@ -46,15 +46,15 @@ if dataset == 'mnist' then
 
     -- test data
     local temp = torch.load('data/mnist/test.th7', 'ascii')
-    tesize = 100 --temp[1]:size()[1]
+    tesize = temp[1]:size()[1]
+
     testData.data = torch.DoubleTensor(tesize, HEIGHT, WIDTH * opt.digits, 1)
-    testData.labels = {}
+    testData.labels = torch.DoubleTensor(tesize, opt.digits)
     for rec = 1, tesize do
         local tempData
         for digit = 1, opt.digits do
             if digit == 1 then
                 tempData = temp[1][rec]
-                testData.labels[rec] = {}
                 testData.labels[rec][digit] = (temp[2][rec] == 0 and 10 or temp[2][rec])
             else
                 local rand = math.floor(math.random() * tesize) + 1

@@ -49,7 +49,7 @@ print '==> defining training procedure'
 function train()
 
     -- epoch tracker
-    epoch = epoch or 1
+    epoch = epoch or 0
 
     -- local vars
     local time = sys.clock()
@@ -70,17 +70,8 @@ function train()
         xlua.progress(t, trsize)
 
         -- create mini batch
-        local inputs = {}
-        local targets = {}
-
-        for i = t, math.min(t + opt.batchSize - 1, trsize) do
-            -- load new sample
-            local input = trainData.data[shuffle[i]]
-            local target = trainData.labels[shuffle[i]]
-
-            table.insert(inputs, input)
-            table.insert(targets, target)
-        end
+        local inputs = trainData.data:index(1, shuffle:sub(t, t + opt.batchSize - 1):long())
+        local targets = trainData.labels:index(1, shuffle:sub(t, t + opt.batchSize - 1):long())[{{},1}]
 
 
         -- Nesterov momentum
@@ -103,29 +94,29 @@ function train()
         local f = 0
 
         -- evaluate function for complete mini batch
-        for i = 1, #inputs do
-            -- estimate f
-            output = model:forward(inputs[i])
-            local err = criterion:forward(output, torch.Tensor(targets[i]))
-            f = f + err
 
-            -- estimate df/dW
-            local df_do = criterion:backward(output, torch.Tensor(targets[i]))
-            model:backward(inputs[i], df_do)
+        -- estimate f
+        output = model:forward(inputs)
+        local err = criterion:forward(output, targets)
+        f = f + err
 
-            -- update confusion
-            if (opt.model == 'va') then
-                confusion:add(output[1][1], targets[i][1])
-            else
-                for d = 1, opt.digits do
-                    confusion:add(output[d], targets[i][d])
-                end
+        -- estimate df/dW
+        local df_do = criterion:backward(output, targets)
+        model:backward(inputs, df_do)
+
+        -- update confusion
+        if (opt.model == 'va') then
+            confusion:batchAdd(output[1], targets)
+        else
+            for d = 1, opt.digits do
+                confusion:add(output[d], targets[i][d])
             end
         end
 
+
         -- normalize gradients and f(X)
-        gradParameters:div(#inputs)
-        f = f / #inputs
+        gradParameters:div(inputs:size()[1])
+        f = f / inputs:size()[1]
 
         -- weight decay
         if (wd ~= 0) then
@@ -197,16 +188,8 @@ function trainOptim()
         xlua.progress(t, trsize)
 
         -- create mini batch
-        local inputs = {}
-        local targets = {}
-        for i = t, math.min(t + opt.batchSize - 1, trsize) do
-            -- load new sample
-            local input = trainData.data[shuffle[i]]
-            local target = trainData.labels[shuffle[i]]
-
-            table.insert(inputs, input)
-            table.insert(targets, target)
-        end
+        local inputs = trainData.data:index(1, shuffle:sub(t, t + opt.batchSize - 1):long())
+        local targets = trainData.labels:index(1, shuffle:sub(t, t + opt.batchSize - 1):long())[{{},1}]
 
         -- create closure to evaluate f(X) and df/dX
         local feval = function(x)
@@ -221,30 +204,27 @@ function trainOptim()
             -- f is the average of all criterions
             local f = 0
 
-            -- evaluate function for complete mini batch
-            for i = 1, #inputs do
-                -- estimate f
-                output = model:forward(inputs[i])
-                local err = criterion:forward(output, torch.Tensor(targets[i]))
-                f = f + err
+            -- estimate f
+            output = model:forward(inputs)
+            local err = criterion:forward(output, targets)
+            f = f + err
 
-                -- estimate df/dW
-                local df_do = criterion:backward(output, torch.Tensor(targets[i]))
-                model:backward(inputs[i], df_do)
+            -- estimate df/dW
+            local df_do = criterion:backward(output, targets)
+            model:backward(inputs, df_do)
 
-                -- update confusion
-                if (opt.model == 'va') then
-                    confusion:add(output[1][1], targets[i][1])
-                else
-                    for d = 1, opt.digits do
-                        confusion:add(output[d], targets[i][d])
-                    end
+            -- update confusion
+            if (opt.model == 'va') then
+                confusion:batchAdd(output[1], targets)
+            else
+                for d = 1, opt.digits do
+                    confusion:add(output[d], targets[i][d])
                 end
             end
 
             -- normalize gradients and f(X)
-            gradParameters:div(#inputs)
-            f = f / #inputs
+            gradParameters:div(inputs:size()[1])
+            f = f / inputs:size()[1]
 
             -- return f and df/dX
             return f, gradParameters
